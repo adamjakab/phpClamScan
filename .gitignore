@@ -1,0 +1,8 @@
+# Created by .ignore support plugin (hsz.mobi)
+.idea
+phpClamScan/vendor
+phpClamScan/composer.lock
+quarantene
+tests
+/*.yml
+
