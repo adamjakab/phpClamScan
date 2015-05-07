@@ -1,0 +1,16 @@
+config:
+    paths:
+        - "/folder1"
+        - "/folder2"
+    quarantente_path:     "/path/to/quarantene"
+    move_to_quarantene:   false
+    max_file_size:        3145728
+    report:
+        enabled:          true
+        subject:          "Virus Infection Report"
+        from:             "me@domain.com"
+        to:               "you@domain.com"
+    clamscan_binary:      "/usr/bin/clamdscan"
+    clamscan_options:     "--no-summary"
+
+
