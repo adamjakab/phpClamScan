@@ -1,7 +1,7 @@
 # Created by .ignore support plugin (hsz.mobi)
+composer.lock
 .idea
-phpClamScan/vendor
-phpClamScan/composer.lock
+vendor
 quarantene
 tests
 /*.yml
