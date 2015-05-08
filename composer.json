@@ -12,7 +12,8 @@
         "symfony/console": "^2.6",
         "psr/log": "^1.0",
         "swiftmailer/swiftmailer": "^5.4",
-        "symfony/yaml": "^2.6"
+        "symfony/yaml": "^2.6",
+        "symfony/filesystem": "^2.6"
     },
     "autoload" : {
       "psr-0" : {
