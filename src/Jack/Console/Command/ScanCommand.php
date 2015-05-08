@@ -35,6 +35,7 @@ class ScanCommand extends Command
 	 */
 	public function __construct($name = null) {
 		parent::__construct($name);
+		$this->infections = [];
 		$this->fs = new Filesystem();
 	}
 
@@ -57,11 +58,8 @@ class ScanCommand extends Command
 	 */
 	protected function execute(InputInterface $input, OutputInterface $output) {
 		$this->output = $output;
-		$this->infections = [];
-
 		$config_file = $input->getArgument('config_file');
 		$this->parseConfiguration($config_file);
-
 		$listFilePath = $this->buildFileList();
 		$this->scan($listFilePath);
 		$this->sendInfectionReport();
@@ -80,25 +78,37 @@ class ScanCommand extends Command
 			return;
 		}
 
+		$infections = [];
+
 		//Default Virus Scan
 		$CMD = $this->config["clamscan_binary"]
 		       . " --infected"
 		       . " --no-summary"
-		       . " -f " . $listFilePath
-			;
+		       . " -f " . $listFilePath;
 		$this->output->writeln("Scanning($CMD)...");
-		exec($CMD, $SCANRES_1, $RV);
-		if($RV != 0 && ($viruscount = count($SCANRES_1)) ) {
-			$this->handleInfectedfiles($SCANRES_1);
-		} else {
-			$this->output->writeln("Clean");
+		exec($CMD, $SCANRES, $RV);
+		if($RV != 0 && ($viruscount = count($SCANRES)) ) {
+			$infections = array_merge($infections, $SCANRES);
 		}
 
-		//Optional additional database scans
+		//Optional additional database scans(additional_virus_db)
+		if(isset($this->config["additional_virus_db"]) && is_array($this->config["additional_virus_db"]) && count($this->config["additional_virus_db"])){
+			$CMD = $this->config["clamscan_binary"]
+			       . " --infected"
+			       . " --no-summary"
+			       . " -f " . $listFilePath;
+			foreach($this->config["additional_virus_db"] as $db) {
+				$CMD .= " -d " . $db;
+			}
+			$this->output->writeln("Scanning($CMD)...");
+			exec($CMD, $SCANRES, $RV);
+			if($RV != 0 && ($viruscount = count($SCANRES)) ) {
+				$infections = array_merge($infections, $SCANRES);
+			}
+		}
 
-
+		$this->handleInfectedfiles($infections);
 		$this->fs->remove($listFilePath);
-
 	}
 
 
@@ -106,6 +116,7 @@ class ScanCommand extends Command
 		if(is_array($scanResults) && ($viruscount = count($scanResults))) {
 			$this->output->writeln("Found viruses: " . $viruscount);
 		} else {
+			$this->output->writeln("No viruses found.");
 			return;
 		}
 
@@ -132,7 +143,7 @@ class ScanCommand extends Command
 			}
 		}
 		print_r($scanResults);
-
+		$this->infections = array_merge($this->infections, $scanResults);
 		$this->output->writeln("Executed action on all infected files: " . strtoupper($this->config["infection_action"]));
 
 
@@ -178,9 +189,8 @@ class ScanCommand extends Command
 		}
 
 		$body = "The following infections were found on the scanned node.\n"
-				. "The identified files were quarantened: " . ($this->config["move_to_quarantene"] ? "YES" : "NO")
 		        . "\n\n"
-				. implode("\n", $this->infections);
+				. print_r($this->infections, true);
 
 		$msg = \Swift_Message::newInstance()
 			->setSubject($this->config["report"]["subject"])
