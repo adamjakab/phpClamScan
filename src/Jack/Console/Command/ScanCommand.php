@@ -64,7 +64,7 @@ class ScanCommand extends Command
 
 		$listFilePath = $this->buildFileList();
 		$this->scan($listFilePath);
-		//$this->sendInfectionReport();
+		$this->sendInfectionReport();
 	}
 
 
@@ -98,6 +98,7 @@ class ScanCommand extends Command
 
 
 		$this->fs->remove($listFilePath);
+
 	}
 
 
@@ -170,9 +171,6 @@ class ScanCommand extends Command
 		$answer["file"] = realpath(trim(implode((count($tmp)>1?":":""), $tmp)));
 		return $answer;
 	}
-
-
-
 
 	private function sendInfectionReport() {
 		if(!$this->config["report"]["enabled"] || !count($this->infections)) {
