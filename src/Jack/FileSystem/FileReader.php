@@ -22,11 +22,31 @@ class FileReader {
 		$this->fileResource = null;
 	}
 
-	public function readLn() {
+    public function rewind() {
+        rewind($this->fileResource);
+    }
+
+    public function hasLine($needle) {
+        $answer = false;
+        $this->rewind();
+        while(($line = $this->readLine())) {
+            if($line == $needle) {
+                $answer = true;
+                break;
+            }
+        }
+        return $answer;
+    }
+
+	public function readLine() {
 		$line = false;
 		if($this->fileResource && !feof($this->fileResource)) {
 			$line = trim(fgets($this->fileResource));
 		}
 		return $line;
 	}
+
+    public function getPath() {
+        return $this->path;
+    }
 }

@@ -2,12 +2,12 @@ config:
     paths:
         - "/folder1"
         - "/folder2"
-    quarantente_path:     "/path/to/quarantene"
     temporary_path:       "/path/to/tmp/"
+    file_database:        "/path/to/files.db"
+    virus_database:       "/path/to/quarantene.db"
     infection_action:     "none"
-    clamscan_binary:      "/usr/bin/clamdscan"
     report:
-        enabled:          true
+        enabled:          false
         subject:          "Virus Infection Report"
         from:             "me@domain.com"
         to:               "you@domain.com"

@@ -34,8 +34,12 @@ class FileWriter {
 		}
 	}
 
-	public function getLines() {
+	public function getLinesCount() {
 		return $this->lines;
 	}
+
+    public function getPath() {
+        return $this->path;
+    }
 
 }

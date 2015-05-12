@@ -69,11 +69,10 @@ class ScanCommand extends Command
 		$this->parseConfiguration($config_file);
 		$this->scanner = new Scanner($this->config, $output);
 		$this->scanner->updateFileList();
+        $this->scanner->scan();
 
-		//$listFilePath = $this->buildFileList();
-		//$this->scan($listFilePath);
+		//
 		//$this->sendInfectionReport();
-
 	}
 
 
@@ -204,8 +203,6 @@ class ScanCommand extends Command
 		$mailer->send($msg);
 	}
 
-
-
 	/**
 	 * @param string $config_file
 	 */
@@ -213,25 +210,11 @@ class ScanCommand extends Command
 		if(!file_exists($config_file)) {
 			throw new \InvalidArgumentException("The configuration file does not exist!");
 		}
-
 		$yamlParser = new Parser();
 		$config = $yamlParser->parse(file_get_contents($config_file));
 		if(!is_array($config) || !isset($config["config"])) {
 			throw new \InvalidArgumentException("Malformed configuration file!");
 		}
 		$this->config = $config["config"];
-
-		//check and create quarantene folder
-		if(!$this->_checkDir($this->config["quarantente_path"])) {
-			mkdir($this->config["quarantente_path"], 0700, true);
-		}
-	}
-
-	private function _checkFile($file) {
-		return(file_exists($file) && is_file($file));
-	}
-
-	private function _checkDir($dir) {
-		return(file_exists($dir) && is_dir($dir));
 	}
 }
