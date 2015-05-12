@@ -15,6 +15,10 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Yaml\Parser;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Exception\IOException;
+use Jack\FileSystem\FileReader;
+use Jack\FileSystem\FileWriter;
+use Jack\FileSystem\Scanner;
+use Jack\Database\FilesDb;
 
 class ScanCommand extends Command
 {
@@ -29,6 +33,9 @@ class ScanCommand extends Command
 
 	/** @var Filesystem */
 	private $fs;
+
+	/** @var  Scanner */
+	private $scanner;
 
 	/**
 	 * @param string $name
@@ -60,9 +67,13 @@ class ScanCommand extends Command
 		$this->output = $output;
 		$config_file = $input->getArgument('config_file');
 		$this->parseConfiguration($config_file);
-		$listFilePath = $this->buildFileList();
-		$this->scan($listFilePath);
-		$this->sendInfectionReport();
+		$this->scanner = new Scanner($this->config, $output);
+		$this->scanner->buildFileList();
+
+		//$listFilePath = $this->buildFileList();
+		//$this->scan($listFilePath);
+		//$this->sendInfectionReport();
+
 	}
 
 
@@ -80,10 +91,13 @@ class ScanCommand extends Command
 
 		$infections = [];
 
+		$logPath = $this->config["temporary_path"] . md5("scanLog-".microtime()).'.txt';
+
 		//Default Virus Scan
 		$CMD = $this->config["clamscan_binary"]
 		       . " --infected"
 		       . " --no-summary"
+		       . " --log=".$logPath
 		       . " -f " . $listFilePath;
 		$this->output->writeln("Scanning($CMD)...");
 		exec($CMD, $SCANRES, $RV);
@@ -91,24 +105,8 @@ class ScanCommand extends Command
 			$infections = array_merge($infections, $SCANRES);
 		}
 
-		//Optional additional database scans(additional_virus_db)
-		if(isset($this->config["additional_virus_db"]) && is_array($this->config["additional_virus_db"]) && count($this->config["additional_virus_db"])){
-			$CMD = $this->config["clamscan_binary"]
-			       . " --infected"
-			       . " --no-summary"
-			       . " -f " . $listFilePath;
-			foreach($this->config["additional_virus_db"] as $db) {
-				$CMD .= " -d " . $db;
-			}
-			$this->output->writeln("Scanning($CMD)...");
-			exec($CMD, $SCANRES, $RV);
-			if($RV != 0 && ($viruscount = count($SCANRES)) ) {
-				$infections = array_merge($infections, $SCANRES);
-			}
-		}
-
 		$this->handleInfectedfiles($infections);
-		$this->fs->remove($listFilePath);
+		//$this->fs->remove($listFilePath);
 	}
 
 
@@ -206,46 +204,7 @@ class ScanCommand extends Command
 		$mailer->send($msg);
 	}
 
-	/**
-	 * @return bool|string
-	 */
-	private function buildFileList() {
-		if(isset($this->config["paths"]) && is_array($this->config["paths"]) && count($this->config["paths"])) {
-			$fileName = md5("FileList-".microtime()).'.txt';
-			$filePath = $this->config["temporary_path"] . $fileName;
-			$filesList  = [];
-			foreach($this->config["paths"] as $path) {
-				$filesList = array_merge($filesList, $this->parseFolder($path));
-			}
-			$this->fs->dumpFile($filePath, implode("\n", $filesList));
-			$this->output->writeln("Files to scan: " . count($filesList));
-			return $filePath;
-		} else {
-			$this->output->writeln("<error>No usable scan paths were found!</error>");
-			return false;
-		}
-	}
 
-	/**
-	 * @param string $dir
-	 * @return array
-	 */
-	private function parseFolder($dir) {
-		$list = [];
-		if($this->_checkDir($dir)) {
-			$checkList = glob($dir."/*");
-			if(count($checkList)) {
-				foreach ($checkList as $checkFile) {
-					if (is_dir($checkFile)) {
-						$list = array_merge($list, $this->parseFolder($checkFile));
-					} else {
-						$list[] = realpath($checkFile);
-					}
-				}
-			}
-		}
-		return $list;
-	}
 
 	/**
 	 * @param string $config_file
