@@ -25,13 +25,13 @@ class Scanner {
 	/**
 	 * @return bool|string
 	 */
-	public function buildFileList() {
+	public function updateFileList() {
 		if(isset($this->config["paths"]) && is_array($this->config["paths"]) && count($this->config["paths"])) {
 			$this->output->writeln("Scanning for files...");
 			foreach($this->config["paths"] as $path) {
 				$this->parseFolder($path);
 			}
-			//$this->output->writeln("Files to scan: " . $fileWriter->getLines());
+			$this->output->writeln("Files to scan: " . $this->db->getCount());
 			return true;
 		} else {
 			$this->output->writeln("<error>No usable scan paths were found!</error>");
@@ -51,7 +51,9 @@ class Scanner {
 						$this->parseFolder($checkFile);
 					} else {
 						if(($realpath = realpath($checkFile))) {
+							$this->output->write("adding file: " . $realpath);
 							$this->db->addFile($realpath);
+							$this->output->writeln(" - OK");
 						}
 					}
 				}

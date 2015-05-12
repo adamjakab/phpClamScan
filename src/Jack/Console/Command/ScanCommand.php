@@ -68,7 +68,7 @@ class ScanCommand extends Command
 		$config_file = $input->getArgument('config_file');
 		$this->parseConfiguration($config_file);
 		$this->scanner = new Scanner($this->config, $output);
-		$this->scanner->buildFileList();
+		$this->scanner->updateFileList();
 
 		//$listFilePath = $this->buildFileList();
 		//$this->scan($listFilePath);
