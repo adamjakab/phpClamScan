@@ -17,7 +17,8 @@ class Application extends BaseApplication
 	{
 		parent::__construct(static::NAME, static::VERSION);
 		$this->addCommands([
-								new Command\ScanCommand()
-		                   ]);
+            new Command\ScanCommand(),
+            new Command\TestCommand()
+        ]);
 	}
 }
