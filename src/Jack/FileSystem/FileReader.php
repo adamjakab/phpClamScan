@@ -26,18 +26,15 @@ class FileReader {
         rewind($this->fileResource);
     }
 
-    public function hasLine($needle) {
-        $answer = false;
-        $this->rewind();
-        while(($line = $this->readLine())) {
-            if($line == $needle) {
-                $answer = true;
-                break;
-            }
-        }
-        return $answer;
-    }
+	public function hasLine($needle) {
+		$CMD = 'grep -xc "' . $needle . '" ' . $this->getPath();
+		exec($CMD, $RES, $RV);
+		return ($RV==0 && is_array($RES) && isset($RES[0]) && $RES[0]==1);
+	}
 
+	/**
+	 * @return bool|string
+	 */
 	public function readLine() {
 		$line = false;
 		if($this->fileResource && !feof($this->fileResource)) {
@@ -46,6 +43,9 @@ class FileReader {
 		return $line;
 	}
 
+	/**
+	 * @return string
+	 */
     public function getPath() {
         return $this->path;
     }

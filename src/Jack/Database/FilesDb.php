@@ -35,6 +35,7 @@ class FilesDb {
 		if($stmt->execute()) {
 			$answer = $stmt->fetch(\PDO::FETCH_ASSOC);
 			if(!is_array($answer) || $answer["file_path"] != $filePath) {
+				//echo ("NOT FOUND: '" . $filePath . "' - " . md5($filePath) . "\n");
 				$answer = false;
 			}
 		}
@@ -64,6 +65,24 @@ class FilesDb {
     }
 
 	/**
+	 * Returns the next row on each call - ONLY FILES WITH status not OK
+	 * @param boolean $reset
+	 * @return bool|mixed
+	 */
+	public function getNextScannableFile($reset=false) {
+		if(!$this->filesWalker || $reset) {
+			$query = "SELECT * FROM files"
+			         . " WHERE file_status <> :file_status";
+			$this->filesWalker = $this->db->prepare($query);
+			$status = "OK";
+			$this->filesWalker->bindParam(':file_status', $status, \PDO::PARAM_STR);
+			$this->filesWalker->execute();
+		}
+		$answer = $this->filesWalker->fetch(\PDO::FETCH_ASSOC);
+		return is_array($answer) ? $answer : false;
+	}
+
+	/**
 	 * @param string $filePath
 	 * @return bool
 	 */
@@ -71,14 +90,16 @@ class FilesDb {
 		$file = $this->getFile($filePath);
 		if(!$file) {
 			try {
-				$query = "INSERT INTO files (file_path_md5, file_path, file_md5, file_status) VALUES"
-                    ." (:file_path_md5, :file_path, :file_md5, :file_status)";
+				$query = "INSERT INTO files (file_path_md5, file_path, file_md5, file_status, check_time) VALUES"
+                    ." (:file_path_md5, :file_path, :file_md5, :file_status, :check_time)";
 				$stmt = $this->db->prepare($query);
 				$stmt->bindParam(':file_path_md5', md5($filePath));
 				$stmt->bindParam(':file_path', $filePath);
 				$stmt->bindParam(':file_md5', md5_file($filePath));
 				$file_status = "UNCHECKED";
 				$stmt->bindParam(':file_status', $file_status);
+				$check_time = 0;
+				$stmt->bindParam(':check_time', $check_time);
 				$stmt->execute();
 				return true;
 			} catch (\PDOException $e) {
@@ -86,6 +107,35 @@ class FilesDb {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * @param string $filePath
+	 * @param string $fileStatus
+	 * @return bool
+	 */
+	public function updateFile($filePath, $fileStatus){
+		$file = $this->getFile($filePath);
+		if(!$file) {
+			return false;
+		}
+		try {
+			$query = "UPDATE files SET"
+			         ." file_md5 = :file_md5,"
+			         ." file_status = :file_status,"
+			         ." check_time = :check_time"
+					 ." WHERE file_path_md5 = :file_path_md5";
+			$stmt = $this->db->prepare($query);
+			$stmt->bindParam(':file_path_md5', md5($filePath));
+			$stmt->bindParam(':file_md5', md5_file($filePath));
+			$stmt->bindParam(':file_status', $fileStatus);
+			$check_time = time();
+			$stmt->bindParam(':check_time', $check_time);
+			$stmt->execute();
+			return true;
+		} catch (\PDOException $e) {
+			return false;
+		}
 	}
 
     /**

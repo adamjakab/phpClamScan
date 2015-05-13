@@ -35,7 +35,7 @@ class Scanner {
         $tmpFile->open();
 
         $reset = true;
-        while(($file = $this->db->getNextFile($reset, "UNCHECKED"))) {
+        while(($file = $this->db->getNextScannableFile($reset))) {
             $reset = false;
             $needsScan = $this->checkIfFileNeedsToBeScanned($file);
             //$this->output->writeln("Checking file[".($needsScan?"Y":"N")."]: " . $file["file_path"]);
@@ -43,9 +43,12 @@ class Scanner {
                 $tmpFile->writeLn($file["file_path"]);
             }
         }
+	    $fileCount = $tmpFile->getLinesCount();
+	    $tmpFilePath = $tmpFile->getPath();
         $tmpFile->close();
+	    unset($tmpFile);
 
-        $fileCount = $tmpFile->getLinesCount();
+
         $this->output->writeln("Files to be scanned: " . $fileCount);
         if($fileCount == 0) {
             $this->output->writeln("Nothing to be scanned.");
@@ -54,10 +57,11 @@ class Scanner {
 
         //Default Virus Scan
         $infections = [];
+	    $infectedFiles = [];
         $CMD = $this->getClamscanPath()
             . " --infected"
             . " --no-summary"
-            . " -f " . $tmpFile->getPath();
+            . " -f " . $tmpFilePath;
         //$this->output->writeln("Scanning($CMD)...");
         exec($CMD, $SCANRES, $RV);
         if($RV != 0 && ($viruscount = count($SCANRES)) ) {
@@ -69,13 +73,19 @@ class Scanner {
             return;
         }
 
+	    //HANDLE INFECTIONS
         $this->output->writeln("Number of infections found: " . $infectionsCount);
         foreach($infections as &$infection) {
             $infection = $this->elaborateScanResult($infection);
             $infection["action"] = strtoupper($this->config["infection_action"]);
+
+	        $this->db->updateFile($infection["file_path"], $infection["infection"]);
+	        $this->output->writeln("Infected(".$infection["file_path"].")[".$infection["infection"]."] - action: " . $infection["action"]);
+
             if(!$infection["file_path"]) {
                 $infection["result"] = "File has disappeared!";
             } else {
+	            $infectedFiles[] = $infection["file_path"];
                 switch($infection["action"]) {
                     case "NONE":
                         $infection["result"] = "No action taken.";
@@ -92,7 +102,18 @@ class Scanner {
                 }
             }
         }
-        print_r($infections);
+
+	    //HANDLE NOT INFECTED FILES
+	    $tmpFile = new FileReader($tmpFilePath);
+	    $tmpFile->open();
+	    $this->db->beginTransaction();
+	    while(($filePath = $tmpFile->readLine())) {
+		    if(!in_array($filePath, $infectedFiles)) {
+			    $this->output->writeln("Handling: " . $filePath);
+			    $this->db->updateFile($filePath, "OK");
+		    }
+	    }
+	    $this->db->commitTransaction();
     }
 
     /**
@@ -103,7 +124,7 @@ class Scanner {
         $answer = ["file_path"=>null, "infection"=>null];
         $tmp = explode(":", $scanResult);
         $answer["infection"] = trim(str_replace("FOUND","",array_pop($tmp)));
-        $answer["file_path"] = realpath(trim(implode((count($tmp)>1?":":""), $tmp)));
+        $answer["file_path"] = trim(implode((count($tmp)>1?":":""), $tmp));
         return $answer;
     }
 
@@ -127,7 +148,7 @@ class Scanner {
      */
     protected function checkIfFileNeedsToBeScanned($file) {
         $answer = false;
-        if($file["file_status"] == "UNCHECKED") {
+        if($file["file_status"] != "OK") {
             $answer = true;
         } else if((int)$file["check_time"] == 0) {
             $answer = true;
@@ -158,6 +179,7 @@ class Scanner {
         $tmpFile->open();
 
         //update database with files in paths
+		$this->output->writeln("Updating files database #1(add)...");
         $this->db->beginTransaction();
         while(($filePath = $tmpFile->readLine())) {
             $this->db->addFile($filePath);
@@ -165,11 +187,13 @@ class Scanner {
         $this->db->commitTransaction();
 
         //update database by removing obsolete files
+		$this->output->writeln("Updating files database #2(del)...");
         $this->db->beginTransaction();
         $reset = true;
         while(($file = $this->db->getNextFile($reset))) {
             $reset = false;
             $exists = $tmpFile->hasLine($file["file_path"]);
+	        //$this->output->writeln("Chk(".($exists?"Y":"N")."): " . $file["file_path"]);
             if(!$exists) {
                 $this->db->removeFile($file["file_path"]);
             }

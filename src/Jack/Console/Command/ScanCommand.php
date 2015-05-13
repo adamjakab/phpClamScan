@@ -73,6 +73,7 @@ class ScanCommand extends Command
 
 		//
 		//$this->sendInfectionReport();
+		$this->output->writeln("Done");
 	}
 
 
