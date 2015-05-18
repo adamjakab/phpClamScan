@@ -22,6 +22,14 @@ class SqliteDb {
 		$this->db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 	}
 
+    public function beginTransaction() {
+        $this->db->beginTransaction();
+    }
+
+    public function commitTransaction() {
+        $this->db->commit();
+    }
+
 	/**
 	 * @param string $msg
 	 */

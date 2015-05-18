@@ -3,6 +3,7 @@ namespace Jack\Console\Command;
 
 use Jack\Console\System\Executor;
 use Jack\Database\FilesDb;
+use Jack\Database\QuaranteneDb;
 use Jack\FileSystem\FileScanner;
 use Jack\FileSystem\VirusScanner;
 use Symfony\Component\Console\Input\InputArgument;
@@ -18,8 +19,14 @@ class ScanCommand extends Command
 	/** @var  FileScanner */
 	private $fileScanner;
 
+    /** @var  VirusScanner */
+    private $virusScanner;
+
 	/** @var  FilesDb */
 	private $filesDb;
+
+    /** @var  QuaranteneDb */
+    private $quaranteneDb;
 
 	/**
 	 * @param string $name
@@ -49,22 +56,30 @@ class ScanCommand extends Command
 	protected function execute(InputInterface $input, OutputInterface $output) {
 		parent::_execute($input, $output);
 		$this->checkConfiguration();
-		$this->fileScanner = new FileScanner($this->config, function($msg) {$this->log($msg);});
 		$this->filesDb = new FilesDb($this->config["file_database"], function($msg) {$this->log($msg);});
+        $this->quaranteneDb = new QuaranteneDb($this->config["virus_database"], function($msg) {$this->log($msg);});
+        $this->fileScanner = new FileScanner($this->config, function($msg) {$this->log($msg);});
+        $this->virusScanner = new VirusScanner($this->config, $this->filesDb, $this->quaranteneDb, function($msg) {$this->log($msg);});
 		$fs = new FileSystem();
 		//
-		$filesList = $this->generateFilesList();
-		$filesChecksumList = $this->calculateChecksumFromFilesList($filesList);
-		$dbChecksumList = $this->calculateChecksumFromDatabaseFiles();
-		$diffList1 = $this->generateDiffList($filesChecksumList, $dbChecksumList);//new or changed
-		$diffList2 = $this->generateDiffList($dbChecksumList, $filesChecksumList);//deleted or changed
+		$filesListFs = $this->generateFilesList();
+        $filesListDb = $this->getDatabaseFilesList(false);
+        $diffList1 = $this->generateDiffList($filesListDb, $filesListFs);
+        $diffList2 = $this->generateDiffList($filesListFs, $filesListDb);
+        //
+        $this->virusScanner->scan($diffList1);//new files
 
+
+		//$filesChecksumList = $this->calculateChecksumFromFilesList($filesList);
+		//$dbChecksumList = $this->getDatabaseFilesList();
+		//$diffList1 = $this->generateDiffList($filesChecksumList, $dbChecksumList);//new or changed
+		//$diffList2 = $this->generateDiffList($dbChecksumList, $filesChecksumList);//deleted or changed
 
 		//$this->scanner->scan();
 		//$this->sendInfectionReport();
 
-
-		$fs->remove($filesList);
+		//$fs->remove($filesListFs);
+        //$fs->remove($filesListDb);
 		//$fs->remove($checksumList);
 		//$fs->remove($dbChecksumList);
 		//$fs->remove($diffList1);
@@ -85,13 +100,13 @@ class ScanCommand extends Command
 	}
 
 	/**
+     * @param boolean $withChecksum
 	 * @return string
 	 */
-	private function calculateChecksumFromDatabaseFiles() {
-		$checksumFilePath = $this->getTemporaryFileName();
-		$this->log("DBFiles: " . $this->filesDb->getCount());
-		$this->filesDb->dumpFileChecksumList($checksumFilePath);
-		return $checksumFilePath;
+	private function getDatabaseFilesList($withChecksum=false) {
+		$filesPath = $this->getTemporaryFileName();
+		$this->filesDb->dumpFilesList($filesPath, $withChecksum);
+		return $filesPath;
 	}
 
 	/**
@@ -116,35 +131,7 @@ class ScanCommand extends Command
 		return $listFilePath;
 	}
 
-	/**
-	 *
-	 * /usr/bin/clamscan -d /usr/local/maldetect/tmp/.runtime.user.21512.hdb -d /usr/local/maldetect/tmp/.runtime.user.21512.ndb  -r --infected --no-summary -f /usr/local/maldetect/tmp/.find.21512
-	 *
-	 * @param string $listFilePath
-	 */
-	private function scan($listFilePath) {
-		if (!$listFilePath) {
-			$this->output->writeln("No files to scan!");
 
-			return;
-		}
-
-		$infections = [];
-
-		$logPath = $this->config["temporary_path"] . md5("scanLog-" . microtime()) . '.txt';
-
-		//Default Virus Scan
-		$CMD = $this->config["clamscan_binary"] . " --infected" . " --no-summary" . " --log=" . $logPath . " -f "
-		       . $listFilePath;
-		$this->output->writeln("Scanning($CMD)...");
-		exec($CMD, $SCANRES, $RV);
-		if ($RV != 0 && ($viruscount = count($SCANRES))) {
-			$infections = array_merge($infections, $SCANRES);
-		}
-
-		$this->handleInfectedfiles($infections);
-		//$this->fs->remove($listFilePath);
-	}
 
 
 	private function handleInfectedfiles($scanResults) {

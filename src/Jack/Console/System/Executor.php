@@ -28,7 +28,7 @@ class Executor {
         $binary = $this->getBinaryPath($binary);
         $arguments = implode(" ", array_filter($arguments));
         $command = "$binary $arguments";
-        echo "Executing command: " . $command . "\n";
+        //echo "Executing command: " . $command . "\n";
         exec($command, $output, $return_val);
         return [
             "output" => $output,
