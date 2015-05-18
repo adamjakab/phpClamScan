@@ -17,8 +17,11 @@ class FileWriter {
 		$this->path = $path;
 	}
 
-	public function open() {
-		$this->fileResource = fopen($this->path, "w+");
+	/**
+	 * @param string $mode
+	 */
+	public function open($mode='w+') {
+		$this->fileResource = fopen($this->path, $mode);
 		$this->lines = 0;
 	}
 

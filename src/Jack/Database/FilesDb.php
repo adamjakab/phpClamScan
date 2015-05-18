@@ -2,25 +2,38 @@
 namespace Jack\Database;
 
 
-class FilesDb {
-	/** @var  string */
-	private $dbPath;
+use Jack\FileSystem\FileWriter;
 
-	/** @var  \PDO */
-	private $db;
-
+class FilesDb extends SqliteDb
+{
     /** @var  \PDOStatement */
     private $filesWalker;
 
-
-	public function __construct($dbPath) {
-		$this->dbPath = $dbPath;
+	/**
+	 * @param string $dbPath
+	 * @param callable $logger
+	 */
+	public function __construct($dbPath, $logger) {
+		parent::__construct($dbPath, $logger);
+		$this->setupDatabase();
 	}
 
-	public function open() {
-		$this->db = new \PDO('sqlite:' . $this->dbPath);
-		$this->db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-		$this->setupDatabase();
+
+	/**
+	 * Dumps a file list using db resources exactly in the same format as md5deep does (for confront)
+	 * @param string $listFile
+	 */
+	public function dumpFileChecksumList($listFile) {
+		$query = "SELECT file_path, file_md5 FROM files ORDER BY file_path";
+		$stmt = $this->db->prepare($query);
+		if($stmt->execute()) {
+			$fw = new FileWriter($listFile);
+			$fw->open("w");
+			while($file = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+				$fw->writeLn($file["file_md5"] . "  " . $file["file_path"]);
+			}
+			$fw->close();
+		}
 	}
 
 	/**
